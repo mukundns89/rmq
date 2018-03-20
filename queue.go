@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/adjust/uniuri"
@@ -59,6 +60,7 @@ type redisQueue struct {
 	prefetchLimit    int           // max number of prefetched deliveries number of unacked can go up to prefetchLimit + numConsumers
 	pollDuration     time.Duration
 	consumingStopped bool
+	stopWg           sync.WaitGroup
 }
 
 func newQueue(name, connectionName, queuesKey string, redisClient *redis.Client) *redisQueue {
@@ -243,6 +245,7 @@ func (queue *redisQueue) StopConsuming() bool {
 // AddConsumer adds a consumer to the queue and returns its internal name
 // panics if StartConsuming wasn't called before!
 func (queue *redisQueue) AddConsumer(tag string, consumer Consumer) string {
+	queue.stopWg.Add(1)
 	name := queue.addConsumer(tag)
 	go queue.consumerConsume(consumer)
 	return name
@@ -309,7 +312,7 @@ func (queue *redisQueue) consume() {
 		}
 
 		if queue.consumingStopped {
-			// log.Printf("rmq queue stopped consuming %s", queue)
+			close(queue.deliveryChan)
 			return
 		}
 	}
@@ -351,6 +354,7 @@ func (queue *redisQueue) consumerConsume(consumer Consumer) {
 		// debug(fmt.Sprintf("consumer consume %s %s", delivery, consumer)) // COMMENTOUT
 		consumer.Consume(delivery)
 	}
+	queue.stopWg.Done()
 }
 
 func (queue *redisQueue) consumerBatchConsume(batchSize int, timeout time.Duration, consumer BatchConsumer) {

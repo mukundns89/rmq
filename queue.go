@@ -253,6 +253,7 @@ func (queue *redisQueue) AddBatchConsumer(tag string, batchSize int, consumer Ba
 }
 
 func (queue *redisQueue) AddBatchConsumerWithTimeout(tag string, batchSize int, timeout time.Duration, consumer BatchConsumer) string {
+	queue.stopWg.Add(1)
 	name := queue.addConsumer(tag)
 	go queue.consumerBatchConsume(batchSize, timeout, consumer)
 	return name
@@ -354,6 +355,7 @@ func (queue *redisQueue) consumerConsume(consumer Consumer) {
 }
 
 func (queue *redisQueue) consumerBatchConsume(batchSize int, timeout time.Duration, consumer BatchConsumer) {
+	defer queue.stopWg.Done()
 	batch := []Delivery{}
 	timer := time.NewTimer(timeout)
 	stopTimer(timer) // timer not active yet
@@ -366,6 +368,9 @@ func (queue *redisQueue) consumerBatchConsume(batchSize int, timeout time.Durati
 
 		case delivery, ok := <-queue.deliveryChan:
 			if !ok {
+				consumer.Consume(batch)
+				stopTimer(timer) // stop and drain the timer if it fired in between
+
 				// debug("batch channel closed") // COMMENTOUT
 				return
 			}

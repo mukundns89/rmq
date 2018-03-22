@@ -234,12 +234,15 @@ func (queue *redisQueue) StartConsuming(prefetchLimit int, pollDuration time.Dur
 }
 
 func (queue *redisQueue) StopConsuming() <-chan struct{} {
+	// log.Printf("rmq queue stopping %s", queue)
 	queue.consumingStopped = true
 	finishedChan := make(chan struct{})
 	go func() {
 		queue.stopWg.Wait()
 		close(finishedChan)
+		// log.Printf("rmq queue stopped consuming %s", queue)
 	}()
+
 	return finishedChan
 }
 
@@ -315,6 +318,7 @@ func (queue *redisQueue) consume() {
 
 		if queue.consumingStopped {
 			close(queue.deliveryChan)
+			// log.Printf("rmq queue stopped fetching %s", queue)
 			return
 		}
 	}

@@ -35,7 +35,7 @@ type Queue interface {
 	PublishBytes(payload []byte) bool
 	SetPushQueue(pushQueue Queue)
 	StartConsuming(prefetchLimit int, pollDuration time.Duration) bool
-	StopConsuming() *sync.WaitGroup
+	StopConsuming() <-chan struct{}
 	AddConsumer(tag string, consumer Consumer) string
 	AddBatchConsumer(tag string, batchSize int, consumer BatchConsumer) string
 	AddBatchConsumerWithTimeout(tag string, batchSize int, timeout time.Duration, consumer BatchConsumer) string
@@ -233,9 +233,14 @@ func (queue *redisQueue) StartConsuming(prefetchLimit int, pollDuration time.Dur
 	return true
 }
 
-func (queue *redisQueue) StopConsuming() *sync.WaitGroup {
+func (queue *redisQueue) StopConsuming() <-chan struct{} {
 	queue.consumingStopped = true
-	return &queue.stopWg
+	finishedChan := make(chan struct{})
+	go func() {
+		queue.stopWg.Wait()
+		close(finishedChan)
+	}()
+	return finishedChan
 }
 
 // AddConsumer adds a consumer to the queue and returns its internal name

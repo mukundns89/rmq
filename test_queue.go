@@ -1,7 +1,6 @@
 package rmq
 
 import (
-	"sync"
 	"time"
 )
 
@@ -36,7 +35,7 @@ func (queue *TestQueue) StartConsuming(prefetchLimit int, pollDuration time.Dura
 	return true
 }
 
-func (queue *TestQueue) StopConsuming() *sync.WaitGroup {
+func (queue *TestQueue) StopConsuming() <-chan struct{} {
 	return nil
 }
 

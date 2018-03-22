@@ -35,7 +35,7 @@ type Queue interface {
 	PublishBytes(payload []byte) bool
 	SetPushQueue(pushQueue Queue)
 	StartConsuming(prefetchLimit int, pollDuration time.Duration) bool
-	StopConsuming() bool
+	StopConsuming() *sync.WaitGroup
 	AddConsumer(tag string, consumer Consumer) string
 	AddBatchConsumer(tag string, batchSize int, consumer BatchConsumer) string
 	AddBatchConsumerWithTimeout(tag string, batchSize int, timeout time.Duration, consumer BatchConsumer) string
@@ -233,13 +233,9 @@ func (queue *redisQueue) StartConsuming(prefetchLimit int, pollDuration time.Dur
 	return true
 }
 
-func (queue *redisQueue) StopConsuming() bool {
-	if queue.deliveryChan == nil || queue.consumingStopped {
-		return false // not consuming or already stopped
-	}
-
+func (queue *redisQueue) StopConsuming() *sync.WaitGroup {
 	queue.consumingStopped = true
-	return true
+	return &queue.stopWg
 }
 
 // AddConsumer adds a consumer to the queue and returns its internal name
